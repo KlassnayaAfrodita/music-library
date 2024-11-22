@@ -5,12 +5,25 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	"music-library/internal/database"
 	"music-library/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+// APIResponse структура для десериализации ответа от внешнего API
+type APIResponse struct {
+	ReleaseDate string `json:"releaseDate"`
+	Text        string `json:"text"`
+	Link        string `json:"link"`
+}
 
 // GetSongs retrieves a list of songs with filtering and pagination
 func GetSongs(c *gin.Context) {
@@ -109,23 +122,79 @@ func GetLyrics(c *gin.Context) {
 	})
 }
 
-// AddSong adds a new song
+fetchSongInfo делает запрос к внешнему API для получения деталей о песне
+func fetchSongInfo(group, song string) (*APIResponse, error) {
+	apiURL := "https://www.youtube.com/watch?v=Xsp3_a-PMTw" // Замените на реальный URL внешнего API
+
+	// Формируем GET-запрос с параметрами group и song
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Добавляем параметры в URL
+	query := req.URL.Query()
+	query.Add("group", group)
+	query.Add("song", song)
+	req.URL.RawQuery = query.Encode()
+
+	// Отправляем запрос
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Проверяем статус код
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch song details from external API")
+	}
+
+	// Читаем и декодируем ответ
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResponse APIResponse
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
+		return nil, err
+	}
+
+	return &apiResponse, nil
+}
+
+// AddSong добавляет новую песню с данными из внешнего API
 func AddSong(c *gin.Context) {
-	var song models.Song
-	if err := c.ShouldBindJSON(&song); err != nil {
+	var songInput models.Song
+	if err := c.ShouldBindJSON(&songInput); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	// Вставка в базу данных
+	// Получаем данные о песне из внешнего API
+	apiData, err := fetchSongInfo(songInput.GroupName, songInput.SongName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch song details: " + err.Error()})
+		return
+	}
+
+	// Используем данные из внешнего API
+	songInput.ReleaseDate = apiData.ReleaseDate
+	songInput.Lyrics = apiData.Text
+	songInput.Link = apiData.Link
+
+	// Вставляем песню в базу данных
 	query := `INSERT INTO songs (group_name, song_name, release_date, lyrics, link) 
 	          VALUES ($1, $2, $3, $4, $5)`
-	_, err := database.DB.Exec(query, song.GroupName, song.SongName, song.ReleaseDate, song.Lyrics, song.Link)
+	_, err = database.DB.Exec(query, songInput.GroupName, songInput.SongName, songInput.ReleaseDate, songInput.Lyrics, songInput.Link)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save song"})
 		return
 	}
-	c.JSON(http.StatusCreated, song)
+
+	c.JSON(http.StatusCreated, songInput)
 }
 
 // UpdateSong updates the details of a song
