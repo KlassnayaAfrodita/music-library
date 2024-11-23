@@ -1,22 +1,32 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 
 	"music-library/internal/database"
 	"music-library/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+// GetSongs godoc
+// @Summary      Получение песен с фильтрацией и пагинацией
+// @Description  Возвращает список песен с фильтрацией по названию группы и песни, а также поддерживает пагинацию
+// @Tags         Songs
+// @Param        group   query   string  false  "Название группы"
+// @Param        song    query   string  false  "Название песни"
+// @Param        page    query   int     false  "Номер страницы" default(1)
+// @Param        limit   query   int     false  "Количество элементов на странице" default(10)
+// @Success      200     {object}  []models.Song
+// @Failure      400     {object}  map[string]string
+// @Failure      500     {object}  map[string]string
+// @Router       /songs [get]
 
 // APIResponse структура для десериализации ответа от внешнего API
 type APIResponse struct {
@@ -25,7 +35,18 @@ type APIResponse struct {
 	Link        string `json:"link"`
 }
 
-// GetSongs retrieves a list of songs with filtering and pagination
+// GetSongs godoc
+// @Summary      Получение песен с фильтрацией и пагинацией
+// @Description  Возвращает список песен с фильтрацией по названию группы и песни, а также поддерживает пагинацию
+// @Tags         Songs
+// @Param        group   query   string  false  "Название группы"
+// @Param        song    query   string  false  "Название песни"
+// @Param        page    query   int     false  "Номер страницы" default(1)
+// @Param        limit   query   int     false  "Количество элементов на странице" default(10)
+// @Success      200     {object}  []models.Song
+// @Failure      400     {object}  map[string]string
+// @Failure      500     {object}  map[string]string
+// @Router       /songs [get]
 func GetSongs(c *gin.Context) {
 	var songs []models.Song
 
@@ -68,7 +89,17 @@ func GetSongs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"songs": songs, "page": page, "limit": limit})
 }
 
-// GetLyrics retrieves song lyrics with pagination by verses
+// GetLyrics godoc
+// @Summary      Получение текста песни с пагинацией
+// @Description  Возвращает текст песни, разделённый на куплеты, с поддержкой пагинации
+// @Tags         Songs
+// @Param        id     path     int  true   "ID песни"
+// @Param        page   query    int  false  "Номер страницы" default(1)
+// @Param        limit  query    int  false  "Количество строк на странице" default(2)
+// @Success      200    {object} map[string]interface{}
+// @Failure      400    {object} map[string]string
+// @Failure      404    {object} map[string]string
+// @Router       /songs/{id}/lyrics [get]
 func GetLyrics(c *gin.Context) {
 	idStr := c.Param("id")
 	pageStr := c.DefaultQuery("page", "1")
@@ -122,7 +153,7 @@ func GetLyrics(c *gin.Context) {
 	})
 }
 
-fetchSongInfo делает запрос к внешнему API для получения деталей о песне
+// fetchSongInfo делает запрос к внешнему API для получения деталей о песне
 func fetchSongInfo(group, song string) (*APIResponse, error) {
 	apiURL := "https://www.youtube.com/watch?v=Xsp3_a-PMTw" // Замените на реальный URL внешнего API
 
@@ -152,7 +183,7 @@ func fetchSongInfo(group, song string) (*APIResponse, error) {
 	}
 
 	// Читаем и декодируем ответ
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +196,17 @@ func fetchSongInfo(group, song string) (*APIResponse, error) {
 	return &apiResponse, nil
 }
 
-// AddSong добавляет новую песню с данными из внешнего API
+// AddSong godoc
+// @Summary      Добавление новой песни
+// @Description  Добавляет новую песню в библиотеку, запрашивая данные из внешнего API
+// @Tags         Songs
+// @Accept       json
+// @Produce      json
+// @Param        song  body      models.Song  true  "Данные песни"
+// @Success      201   {object}  models.Song
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /songs [post]
 func AddSong(c *gin.Context) {
 	var songInput models.Song
 	if err := c.ShouldBindJSON(&songInput); err != nil {
@@ -197,7 +238,18 @@ func AddSong(c *gin.Context) {
 	c.JSON(http.StatusCreated, songInput)
 }
 
-// UpdateSong updates the details of a song
+// UpdateSong godoc
+// @Summary      Изменение данных песни
+// @Description  Обновляет информацию о песне
+// @Tags         Songs
+// @Accept       json
+// @Produce      json
+// @Param        id    path      int         true  "ID песни"
+// @Param        song  body      models.Song true  "Новые данные песни"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /songs/{id} [put]
 func UpdateSong(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -221,7 +273,15 @@ func UpdateSong(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Song updated successfully"})
 }
 
-// DeleteSong removes a song from the library
+// DeleteSong godoc
+// @Summary      Удаление песни
+// @Description  Удаляет песню из библиотеки
+// @Tags         Songs
+// @Param        id   path      int  true  "ID песни"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /songs/{id} [delete]
 func DeleteSong(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
