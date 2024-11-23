@@ -2,11 +2,17 @@ package main
 
 import (
 	"log"
+	_ "music-library/docs" // Подключаем автоматически сгенерированные Swagger-документы
 
 	"music-library/internal/api"
 	"music-library/internal/database"
 )
 
+// @title Example API
+// @version 1.0
+// @description This is a sample server for Swagger.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	// Подключение базы данных
 	database.ConnectDB()
