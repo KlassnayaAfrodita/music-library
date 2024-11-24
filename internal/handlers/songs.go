@@ -153,50 +153,7 @@ func GetLyrics(c *gin.Context) {
 	})
 }
 
-// fetchSongInfo делает запрос к внешнему API для получения деталей о песне
-func fetchSongInfo(group, song string) (*APIResponse, error) {
-	apiURL := "https://www.youtube.com/watch?v=Xsp3_a-PMTw" // Замените на реальный URL внешнего API
-
-	// Формируем GET-запрос с параметрами group и song
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Добавляем параметры в URL
-	query := req.URL.Query()
-	query.Add("group", group)
-	query.Add("song", song)
-	req.URL.RawQuery = query.Encode()
-
-	// Отправляем запрос
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Проверяем статус код
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to fetch song details from external API")
-	}
-
-	// Читаем и декодируем ответ
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := json.Unmarshal(body, &apiResponse); err != nil {
-		return nil, err
-	}
-
-	return &apiResponse, nil
-}
-
-// AddSong godoc
+/ AddSong godoc
 // @Summary      Добавление новой песни
 // @Description  Добавляет новую песню в библиотеку, запрашивая данные из внешнего API
 // @Tags         Songs
@@ -214,8 +171,8 @@ func AddSong(c *gin.Context) {
 		return
 	}
 
-	// Получаем данные о песне из внешнего API
-	apiData, err := fetchSongInfo(songInput.GroupName, songInput.SongName)
+	// Используем FetchExternalSong для получения данных из внешнего API
+	apiData, err := services.FetchExternalSong(songInput.GroupName, songInput.SongName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch song details: " + err.Error()})
 		return
@@ -223,7 +180,7 @@ func AddSong(c *gin.Context) {
 
 	// Используем данные из внешнего API
 	songInput.ReleaseDate = apiData.ReleaseDate
-	songInput.Lyrics = apiData.Text
+	songInput.Lyrics = apiData.Lyrics
 	songInput.Link = apiData.Link
 
 	// Вставляем песню в базу данных
