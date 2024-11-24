@@ -1,9 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -11,6 +8,7 @@ import (
 
 	"music-library/internal/database"
 	"music-library/internal/models"
+	"music-library/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -153,7 +151,6 @@ func GetLyrics(c *gin.Context) {
 	})
 }
 
-/ AddSong godoc
 // @Summary      Добавление новой песни
 // @Description  Добавляет новую песню в библиотеку, запрашивая данные из внешнего API
 // @Tags         Songs
