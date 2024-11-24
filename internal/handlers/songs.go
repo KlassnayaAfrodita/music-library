@@ -9,6 +9,7 @@ import (
 	"music-library/internal/database"
 	"music-library/internal/logger"
 	"music-library/internal/models"
+	"music-library/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -207,4 +208,52 @@ func DeleteSong(c *gin.Context) {
 
 	logger.Log.WithFields(logrus.Fields{"song_id": id}).Info("Song deleted successfully")
 	c.JSON(http.StatusOK, gin.H{"message": "Song deleted successfully"})
+}
+
+// AddSong godoc
+// @Summary      Добавление новой песни
+// @Description  Добавляет новую песню в библиотеку, запрашивая данные из внешнего API
+// @Tags         Songs
+// @Accept       json
+// @Produce      json
+// @Param        song  body      models.Song  true  "Данные песни"
+// @Success      201   {object}  models.Song
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /songs [post]
+func AddSong(c *gin.Context) {
+	var songInput models.Song
+	if err := c.ShouldBindJSON(&songInput); err != nil {
+		logger.Log.WithError(err).Debug("Invalid input data for adding a new song")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	logger.Log.WithFields(logrus.Fields{
+		"group_name": songInput.GroupName,
+		"song_name":  songInput.SongName,
+	}).Info("Adding a new song")
+
+	apiData, err := services.FetchExternalSong(songInput.GroupName, songInput.SongName)
+	if err != nil {
+		logger.Log.WithError(err).Debug("Failed to fetch song details from external API")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch song details: " + err.Error()})
+		return
+	}
+
+	songInput.ReleaseDate = apiData.ReleaseDate
+	songInput.Lyrics = apiData.Lyrics
+	songInput.Link = apiData.Link
+
+	query := `INSERT INTO songs (group_name, song_name, release_date, lyrics, link) 
+	          VALUES ($1, $2, $3, $4, $5)`
+	_, err = database.DB.Exec(query, songInput.GroupName, songInput.SongName, songInput.ReleaseDate, songInput.Lyrics, songInput.Link)
+	if err != nil {
+		logger.Log.WithError(err).Debug("Failed to insert song into database")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save song"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, songInput)
+	logger.Log.Info("Song added successfully")
 }
