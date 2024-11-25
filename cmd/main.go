@@ -8,6 +8,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"music-library/internal/api"
+	"music-library/internal/database"
 	"music-library/internal/logger"
 	"music-library/internal/middleware"
 )
@@ -17,8 +18,8 @@ func main() {
 	logger.Init()
 
 	// Подключение базы данных
-	// database.ConnectDB()
-	// defer database.DB.Close()
+	database.ConnectDB()
+	defer database.DB.Close()
 
 	router := api.SetupRouter()
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
